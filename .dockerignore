@@ -1,0 +1,24 @@
+# Git and IDE
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Local env and artifacts
+.venv
+*.duckdb
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+htmlcov
+
+# Docs and meta (README.md is copied in Dockerfile for build)
+QUESTION.md
+CLAUDE.md
+*.md
+!README.md
+tests
