@@ -10,7 +10,7 @@ class PipelineConfig:
     start_url: str = "https://en.wikipedia.org/wiki/Toronto"
     max_depth: int = 2
     max_links_per_page: int = 25
-    concurrency: int = 10
+    concurrency: int = 20
     request_delay: float = 0.5
     db_path: str = "pipeline.duckdb"
     max_retries: int = 3
@@ -18,3 +18,5 @@ class PipelineConfig:
     user_agent: str = field(
         default_factory=lambda: "ETLPipeline/1.0 (Wikipedia crawl; educational)"
     )
+    bulk_chunk_size: int = 1000
+    min_content_length: int = 50

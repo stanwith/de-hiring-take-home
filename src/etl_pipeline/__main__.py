@@ -48,6 +48,12 @@ def main() -> None:
         help="DuckDB database path (default: pipeline.duckdb)",
     )
     parser.add_argument(
+        "--min-content-length",
+        type=int,
+        default=50,
+        help="Minimum content length for production view (default: 50)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -69,25 +75,42 @@ def main() -> None:
         concurrency=args.concurrency,
         request_delay=args.request_delay,
         db_path=args.db,
+        min_content_length=args.min_content_length,
     )
 
     report = run_pipeline(config)
 
-    print("\nPipeline complete:")
+    print("\n" + "=" * 60)
+    print("PIPELINE COMPLETE")
+    print("=" * 60)
     print(f"  Pages crawled:     {report.pages_crawled}")
     print(f"  Pages loaded:      {report.pages_loaded}")
     print(f"  Links extracted:   {report.links_extracted}")
     print(f"  Links loaded:      {report.links_loaded}")
-    print(f"  Duration:          {report.duration_seconds:.2f}s")
-    print(f"  Throughput:        {report.pages_per_minute:.1f} pages/min")
-    print(f"                     {report.links_per_minute:.1f} links/min")
+    print()
+    print(f"  Total duration:    {report.duration_seconds:.2f}s")
+    print(
+        f"    - Extract:       {report.extract_duration_seconds:.2f}s ({report.extract_duration_seconds / report.duration_seconds * 100:.1f}%)"
+    )
+    print(
+        f"    - Load:          {report.load_duration_seconds:.2f}s ({report.load_duration_seconds / report.duration_seconds * 100:.1f}%)"
+    )
+    print()
+    print("  Throughput:")
+    print(f"    - Pages/min:     {report.pages_per_minute:.1f}")
+    print(f"    - Links/min:     {report.links_per_minute:.1f}")
 
     if report.errors:
+        print()
         print(f"  Errors:            {len(report.errors)}")
-        for e in report.errors:
+        for e in report.errors[:5]:  # Show first 5 errors
             print(f"    - {e}")
+        if len(report.errors) > 5:
+            print(f"    ... and {len(report.errors) - 5} more")
+        print("=" * 60)
         sys.exit(1)
 
+    print("=" * 60)
     sys.exit(0)
 
 

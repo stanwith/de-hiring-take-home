@@ -37,10 +37,17 @@ def load_to_db(
     db_path: str,
     pages: list[PageData],
     links: list[PageLink],
+    min_content_length: int = 50,
 ) -> None:
     """
     Load validated pages and links into DuckDB.
     Creates staging tables and production views.
+
+    Args:
+        db_path: Path to DuckDB database file
+        pages: List of validated page data
+        links: List of page links
+        min_content_length: Minimum content length for production view (default: 50)
     """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     conn = duckdb.connect(db_path)
@@ -79,16 +86,32 @@ def load_to_db(
     if pages:
         page_rows = [
             (
-                p.url, p.title, p.summary, p.content, p.word_count,
-                p.depth, p.parent_url, p.last_modified, p.crawled_at,
+                p.url,
+                p.title,
+                p.summary,
+                p.content,
+                p.word_count,
+                p.depth,
+                p.parent_url,
+                p.last_modified,
+                p.crawled_at,
             )
             for p in pages
         ]
         _bulk_insert(
             conn,
             "staging.pages",
-            ["url", "title", "summary", "content", "word_count",
-             "depth", "parent_url", "last_modified", "crawled_at"],
+            [
+                "url",
+                "title",
+                "summary",
+                "content",
+                "word_count",
+                "depth",
+                "parent_url",
+                "last_modified",
+                "crawled_at",
+            ],
             page_rows,
         )
         logger.info("Loaded %d pages into staging.pages", len(pages))
@@ -106,10 +129,25 @@ def load_to_db(
         )
         logger.info("Loaded %d links into staging.page_links", len(links))
 
-    # Create production views
+    # FIX: Add indexes for better JOIN performance
+    logger.info("Creating indexes on staging tables...")
     conn.execute(
-        "CREATE OR REPLACE VIEW production.pages AS SELECT * FROM staging.pages WHERE title IS NOT NULL AND content != '' AND length(content) > 50"
+        "CREATE INDEX IF NOT EXISTS idx_page_links_source ON staging.page_links(source_url)"
     )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_page_links_target ON staging.page_links(target_url)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pages_url ON staging.pages(url)")
+    logger.info("Indexes created")
+
+    # Create production views with configurable content length filter
+    conn.execute(f"""
+        CREATE OR REPLACE VIEW production.pages AS 
+        SELECT * FROM staging.pages 
+        WHERE title IS NOT NULL 
+          AND content != '' 
+          AND length(content) > {min_content_length}
+    """)
     conn.execute("""
         CREATE OR REPLACE VIEW production.page_links AS
         SELECT pl.source_url, pl.target_url, pl.link_text

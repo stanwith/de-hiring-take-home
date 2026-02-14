@@ -24,6 +24,8 @@ class PipelineReport:
     pages_per_minute: float
     links_per_minute: float
     errors: list[str]
+    extract_duration_seconds: float
+    load_duration_seconds: float
 
 
 def run_pipeline(config: PipelineConfig) -> PipelineReport:
@@ -37,19 +39,19 @@ def run_pipeline(config: PipelineConfig) -> PipelineReport:
 
     # Extract + Transform (pages are parsed during crawl)
     t0 = time.perf_counter()
-    pages, links, crawl_errors = asyncio.run(crawl(config))  # ✅ Unpack 3 values
-    errors.extend(crawl_errors)  # Add crawl errors to the report
-    crawl_duration = time.perf_counter() - t0
+    pages, links, crawl_errors = asyncio.run(crawl(config))
+    errors.extend(crawl_errors)
+    extract_duration = time.perf_counter() - t0
     logger.info(
         "Extract+Transform: %d pages, %d links in %.2fs",
         len(pages),
         len(links),
-        crawl_duration,
+        extract_duration,
     )
 
     # Load
     t1 = time.perf_counter()
-    load_to_db(config.db_path, pages, links)
+    load_to_db(config.db_path, pages, links, config.min_content_length)
     load_duration = time.perf_counter() - t1
     logger.info("Load: completed in %.2fs", load_duration)
 
@@ -60,8 +62,11 @@ def run_pipeline(config: PipelineConfig) -> PipelineReport:
     links_per_min = (len(links) / total_duration * 60) if total_duration > 0 else 0.0
 
     logger.info(
-        "Pipeline complete. Duration: %.2fs, Throughput: %.1f pages/min, %.1f links/min",
+        "Pipeline complete. Duration: %.2fs (Extract: %.2fs, Load: %.2fs), "
+        "Throughput: %.1f pages/min, %.1f links/min",
         total_duration,
+        extract_duration,
+        load_duration,
         pages_per_min,
         links_per_min,
     )
@@ -74,5 +79,7 @@ def run_pipeline(config: PipelineConfig) -> PipelineReport:
         duration_seconds=total_duration,
         pages_per_minute=pages_per_min,
         links_per_minute=links_per_min,
-        errors=errors,  # This now includes crawl_errors
+        errors=errors,
+        extract_duration_seconds=extract_duration,
+        load_duration_seconds=load_duration,
     )
