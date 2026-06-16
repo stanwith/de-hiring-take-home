@@ -7,10 +7,10 @@ A data integration pipeline that crawls the [Wikipedia Toronto page](https://en.
 **Requirements**: Python 3.13+, [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 ```bash
-# Install uv (if not already installed)
+#Install uv (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Clone and install dependencies
+#Clone and install dependencies
 git clone <repo-url>
 cd de-hiring-take-home
 uv sync
@@ -28,10 +28,10 @@ uv run wikipedia-etl
 
 ```bash
 uv run wikipedia-etl \
-  --max-links-depth1 50 \    # links to follow from root page (default: 50)
-  --max-links-depth2 10 \    # links to follow per depth-1 page (default: 10)
-  --rate-limit 1.0 \         # requests/second, respect Wikipedia limits (default: 1.0)
-  --concurrent 3 \           # max concurrent requests (default: 3)
+  --max-links-depth1 50 \    #links to follow from root page (default: 50)
+  --max-links-depth2 10 \    #links to follow per depth-1 page (default: 10)
+  --rate-limit 1.0 \         #requests/second, respect Wikipedia limits (default: 1.0)
+  --concurrent 3 \           #max concurrent requests (default: 3)
   --db-path data/wikipedia.db \
   --log-level INFO
 ```
@@ -45,13 +45,13 @@ uv run pytest tests/ -v --cov=src/wikipedia_etl
 **Query results:**
 
 ```bash
-# Pages by depth level
+#Pages by depth level
 sqlite3 data/wikipedia.db "SELECT depth_level, COUNT(*) FROM production_pages GROUP BY depth_level;"
 
-# Production view with link counts
+#Production view with link counts
 sqlite3 data/wikipedia.db "SELECT page_title, depth_level, word_count, outbound_link_count FROM production_page_link_summary LIMIT 10;"
 
-# Pipeline run history
+#Pipeline run history
 sqlite3 data/wikipedia.db "SELECT run_id, status, pages_valid, pages_invalid FROM pipeline_runs;"
 ```
 
@@ -60,7 +60,7 @@ sqlite3 data/wikipedia.db "SELECT run_id, status, pages_valid, pages_invalid FRO
 All data is stored in `data/wikipedia.db` (SQLite). Each pipeline run is identified by a unique `scrape_run_id` (UUID).
 
 ### `staging_pages`
-Raw extracted data — all columns nullable, with per-row validation tracking.
+Raw extracted data where all columns nullable, with per-row validation tracking.
 
 | Column | Type | Description |
 |---|---|---|
@@ -103,7 +103,7 @@ Clean, validated pages. Has CHECK constraints enforcing data quality.
 | `promoted_at` | TEXT | Timestamp when row was promoted from staging |
 
 ### `production_links`
-Clean link graph — only links whose source page is in `production_pages`.
+Clean link graph: Only links whose source page is in `production_pages`.
 
 | Column | Type | Description |
 |---|---|---|
@@ -159,9 +159,9 @@ For links: orphaned links (source page is invalid) and duplicate `(source_url, t
 
 **Link scope**: Only Wikipedia article links (`plnamespace=0`) are followed. External links, file links, and category links are excluded since they don't represent Wikipedia article relationships.
 
-**Disambiguation pages**: Pages flagged as disambiguation by the MediaWiki API are fetched and stored, but their links are not followed — following disambiguation links would fan out to unrelated topic areas.
+**Disambiguation pages**: Pages flagged as disambiguation by the MediaWiki API are fetched and stored, but their links are not followed. Following disambiguation links would fan out to unrelated topic areas.
 
-**Configurable crawl limits**: The Toronto article contains ~1,500+ internal links. Following all of them to depth 2 would be tens of thousands of pages. The defaults (50 at depth 1, 10 per depth-2 page) give a ~550-page crawl in ~9 minutes at 1 req/s — enough to demonstrate the pipeline at a reasonable scale.
+**Configurable crawl limits**: The Toronto article contains ~1,500+ internal links. Following all of them to depth 2 would be tens of thousands of pages. The defaults (50 at depth 1, 10 per depth-2 page) give a ~550-page crawl in ~9 minutes at 1 req/sec, which should be enough to demonstrate the pipeline at a reasonable scale.
 
 **Staging → Production separation**: All extracted data lands in staging first, regardless of quality. The transformer then validates and annotates each row. Only rows that pass all validation checks are promoted to the production tables. This makes the pipeline re-runnable without data loss: failed rows stay in staging with error messages for debugging.
 
@@ -179,4 +179,4 @@ For links: orphaned links (source page is invalid) and duplicate `(source_url, t
 
 **Bottleneck**: The rate limiter, not the network. Wikipedia's API responds in ~100–300ms; the 1s token gap dominates.
 
-**Optimization path**: The MediaWiki API supports batch title queries (`titles=A|B|C...`, up to 50 titles per request). Implementing this would yield ~50x throughput at the same rate limit — fetching 50 pages per request instead of 1. Not implemented here to keep the code straightforward, but the architecture supports adding it to `_fetch_page_api`.
+**Optimization path**: The MediaWiki API supports batch title queries (`titles=A|B|C...`, up to 50 titles per request). Implementing this would yield ~50x throughput at the same rate limit, therefore fetching 50 pages per request instead of 1. Not implemented here to keep the code straightforward, but the architecture supports adding it to `_fetch_page_api`.
