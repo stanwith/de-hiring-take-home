@@ -171,12 +171,26 @@ For links: orphaned links (source page is invalid) and duplicate `(source_url, t
 
 ## Performance Characteristics
 
-| Rate (req/s) | Concurrent | ~Pages | ~Time | Throughput |
-|---|---|---|---|---|
-| 1.0 (default, safe) | 3 | ~551 | ~9 min | ~60 pages/min |
-| 2.0 | 5 | ~551 | ~4.5 min | ~120 pages/min |
-| 5.0 (aggressive) | 10 | ~551 | ~1.8 min | ~300 pages/min |
+**Measured on a full default run** (50 depth-1 links, 10 depth-2 links per page, 1 req/s):
 
-**Bottleneck**: The rate limiter, not the network. Wikipedia's API responds in ~100–300ms; the 1s token gap dominates.
+| Metric | Value |
+|---|---|
+| Pages crawled | 193 (unique, after deduplication) |
+| Links extracted | 1,970 |
+| Elapsed time | 213.6s (~3.6 min) |
+| Pages/min | ~54 |
+| **Links/min** | **~553** |
 
-**Optimization path**: The MediaWiki API supports batch title queries (`titles=A|B|C...`, up to 50 titles per request). Implementing this would yield ~50x throughput at the same rate limit, therefore fetching 50 pages per request instead of 1. Not implemented here to keep the code straightforward, but the architecture supports adding it to `_fetch_page_api`.
+> Note: the theoretical max without deduplication is 1 + 50 + (50 × 10) = 551 pages, but the visited-URL set eliminates pages that appear in multiple link graphs, resulting in ~193 unique pages in practice.
+
+**Projected throughput at higher rate limits:**
+
+| Rate (req/s) | Concurrent | ~Links/min |
+|---|---|---|
+| 1.0 (default, safe) | 3 | ~553 |
+| 2.0 | 5 | ~1,100 |
+| 5.0 (aggressive) | 10 | ~2,750 |
+
+**Bottleneck**: The rate limiter, not the network. Wikipedia's API responds in ~100–300ms; the 1s token gap dominates latency.
+
+**Optimization path**: The MediaWiki API supports batch title queries (`titles=A|B|C...`, up to 50 titles per request). Implementing this would yield ~50x throughput at the same rate limit, thus fetching 50 pages per API call instead of 1. Not implemented here to keep the code straightforward, but the architecture supports adding it to `_fetch_page_api`.
